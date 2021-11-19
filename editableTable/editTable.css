@@ -1,42 +1,68 @@
 body,
-    div,
-    p,
-    ul,
-    li,
-    font,
-    span,
-    td,
-    th {
-        font-size: 10pt;
-        line-height: 155%;
-    }
+div,
+p,
+ul,
+li,
+font,
+span,
+td,
+th {
+    font-size: 10pt;
+    line-height: 155%;
+}
 
-    table {
-        border-top-width: 1px;
-        border-right-width: 1px;
-        border-bottom-width: 0px;
-        border-left-width: 1px;
-        border-top-style: solid;
-        border-right-style: solid;
-        border-bottom-style: none;
-        border-left-style: solid;
-        border-top-color: #CCCCCC;
-        border-right-color: #CCCCCC;
-        border-bottom-color: #CCCCCC;
-        border-left-color: #CCCCCC;
-    }
+table {
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 0px;
+    border-left-width: 1px;
+    border-top-style: solid;
+    border-right-style: solid;
+    border-bottom-style: none;
+    border-left-style: solid;
+    border-top-color: #CCCCCC;
+    border-right-color: #CCCCCC;
+    border-bottom-color: #CCCCCC;
+    border-left-color: #CCCCCC;
+}
 
-    td {
-        border-bottom-width: 1px;
-        border-bottom-style: solid;
-        border-bottom-color: #CCCCCC;
-    }
+thead tr {
+    background-color: #2977b9;
+}
 
-    .EditCell_TextBox {
-        width: 100%;
-        border: 1px solid #0099CC;
-    }
+td {
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: #CCCCCC;
+    text-align: center;
+}
 
-    .EditCell_DropDownList {
-        width: 100%;
-    }
+.editCell_textbox {
+    width: 100%;
+    border: 1px solid #0099CC;
+}
+
+.editCell_dropDown {
+    width: 100%;
+}
+
+.circle {
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    line-height: 20px;
+    text-align: center;
+    background: rgb(36, 117, 217);
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.root_edit {
+    display: flex;
+    flex-direction: column;
+}
+
+.handler_edit {
+    display: flex;
+    justify-content: end;
+}
