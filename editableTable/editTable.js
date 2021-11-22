@@ -1,332 +1,358 @@
 /** 
- * JS实现可编辑的表格   
- * 用法:EditTables(tb1,tb2,tb2,......); 
+ * JS实现可编辑的表格
  **/
-
-//设置多个表格可编辑  
-function EditTables() {
-    for (var i = 0; i < arguments.length; i++) {
-        SetTableCanEdit(arguments[i]);
+(function(){
+    if (typeof Object.prototype.attr != 'function') {
+        Object.defineProperty(Object.prototype, 'attr', {
+            value: function attr(obj) {
+                var args = arguments,
+                    len = args.length,
+                    type = Object.prototype.toString.call(obj);
+                if (!(this instanceof HTMLElement)) {
+                    throw new TypeError('the context which call attr must be a HTMLElement');
+                }
+                if (len === 1) {
+                    if (type === '[object String]') {
+                        return this.getAttribute(obj);
+                    } else if (type === '[object Object]') {
+                        for (var key in obj)
+                            this.setAttribute(key, obj[key]);
+                    }
+                } else if (len === 2 && Object.prototype.toString.call(args[0]) === '[object String]') {
+                    this.setAttribute(arguments[0], arguments[1]);
+                } else {
+                    throw new TypeError('arguments\' length or type is error!');
+                }
+    
+                return this;
+            },
+            writable: false,
+            configurable: false
+        });
     }
+    
+    if (typeof Object.prototype.css != 'function') {
+        Object.defineProperty(Object.prototype, 'css', {
+            value: function attr(obj) {
+                if (!(this instanceof HTMLElement)) {
+                    throw new TypeError('the context which call attr must be a HTMLElement');
+                }
+                if (Object.prototype.toString.call(obj) !== '[object Object]') {
+                    throw new TypeError('the argument must be a plain javascript object');
+                }
+                for (var key in obj) {
+                    //驼峰式命名
+                    var formatKey = key.replace(/[A-Z]/g, function ($1) {
+                        return '-' + $1.toLowerCase();
+                    });
+    
+                    this.style[formatKey] = obj[key];
+                }
+                return this;
+            },
+            writable: false,
+            configurable: false
+        });
+    }
+    
+    if (typeof Object.assign != 'function') {
+        Object.defineProperty(Object, "assign", {
+            value: function assign(target, varArgs) {
+                'use strict';
+                if (target == null) {
+                    throw new TypeError('Cannot convert undefined or null to object');
+                }
+                var to = Object(target);
+    
+                for (var index = 1; index < arguments.length; index++) {
+                    var nextSource = arguments[index];
+    
+                    if (nextSource != null) { // Skip over if undefined or null
+                        for (var nextKey in nextSource) {
+                            // Avoid bugs when hasOwnProperty is shadowed
+                            if (Object.prototype.hasOwnProperty.call(nextSource, nextKey)) {
+                                to[nextKey] = nextSource[nextKey];
+                            }
+                        }
+                    }
+                }
+                return to;
+            },
+            writable: true,
+            configurable: true
+        });
+    }
+
+
+    
+
+})();
+
+
+function TableEditable(opts) {
+    this.opts = Object.assign({}, this.defaults, opts);
+    this.instance = this.createInstance();
 }
 
-//设置表格是可编辑的  
-function SetTableCanEdit(table) {
-    for (var i = 1; i < table.rows.length; i++) {
-        SetRowCanEdit(table.rows[i]);
-    }
+function create(ele) {
+    return document.createElement(ele.toUpperCase());
 }
 
-function SetRowCanEdit(row) {
-    for (var j = 0; j < row.cells.length; j++) {
+function createTable() {
+    return create("table");
+}
 
-        //如果当前单元格指定了编辑类型，则表示允许编辑  
-        var editType = row.cells[j].getAttribute("EditType");
-        if (!editType) {
-            //如果当前单元格没有指定，则查看当前列是否指定  
-            editType = row.parentNode.rows[0].cells[j].getAttribute("EditType");
+function createInput() {
+    return create("input");
+}
+
+
+TableEditable.prototype = {
+    defaults: {
+        width: 500,
+        border: 0,
+        cellpadding: 0,
+        cellspacing: 0,
+        columns: [],
+        selectable: true
+    },
+    createInstance: function () {
+        var instance = this.createContainer(),
+            handler = this.createHandleBtn(),
+            tab = this.crateBaseTable();
+        tab.appendChild(this.createHead());
+        var tbody = this.createBody();
+        var row = this.createRow();
+        this.setRowEditable(row);
+        tbody.appendChild(row);
+        tab.appendChild(tbody);
+        instance.appendChild(handler);
+        instance.appendChild(tab);
+        this.table = tab;
+        return instance;
+    },
+
+    createContainer: function () {
+        var container = create("div").css({
+            width: this.opts.width
+        });
+        container.className = 'root_edit';
+        return container;
+    },
+    createHandleBtn: function () {
+        var parent = create("div"),
+            addBtn = create("div").css({
+                marginRight: 5
+            }),
+            removeBtn = create("div");
+        parent.className = 'handler_edit';
+        addBtn.className = 'circle';
+        removeBtn.className = 'circle';
+        addBtn.textContent = "+";
+        removeBtn.textContent = "-";
+        addBtn.onclick = this.addRow.bind(this);
+        removeBtn.onclick = this.deleteRow.bind(this);
+        parent.appendChild(addBtn);
+        parent.appendChild(removeBtn);
+        return parent;
+    },
+    crateBaseTable: function () {
+        var opts = this.opts,
+            width = opts.width,
+            border = opts.border,
+            cellpadding = opts.cellpadding,
+            cellspacing = opts.cellspacing;
+        return createTable().attr({
+            width: width,
+            border: border,
+            cellpadding: cellpadding,
+            cellspacing: cellspacing
+        });
+    },
+    createHead: function () {
+        var columns = this.opts.columns,
+            thead = create("thead"),
+            tr = create("tr");
+        thead.appendChild(tr);
+        if (this.opts.selectable) {
+            var thChecked = create("th").css({
+                    width: 32
+                }),
+                input = create("input").attr({
+                    type: 'checkbox',
+                    name: 'checkbox'
+                });
+            thChecked.appendChild(input);
+            tr.appendChild(thChecked);
         }
-        if (editType) {
-            row.cells[j].onclick = function() {
-                EditCell(this);
+        for (var i = 0; i < columns.length; i++) {
+            var col = columns[i],
+                th = create("th").attr({
+                    width: col.width || 'auto',
+                });
+            th.textContent = col.name;
+            tr.appendChild(th);
+        }
+        return thead;
+    },
+    createBody: function () {
+        return create('tbody');
+    },
+    createRow: function () {
+        var tr = create("tr");
+        if (this.opts.selectable) {
+            var td = create("td"),
+                input = createInput().attr({
+                    type: 'checkbox'
+                });
+            td.appendChild(input);
+            tr.appendChild(td);
+        }
+        for (var i = 0, columns = this.opts.columns; i < columns.length; i++) {
+            var col = columns[i],
+                td2 = create("td");
+            td2.textContent = col.value || "";
+            td2.value = col.value || "";
+            tr.appendChild(td2);
+        }
+        return tr;
+    },
+    setRowEditable: function (row) {
+        var opts = this.opts,
+            selectable = opts.selectable,
+            columns = opts.columns,
+            ctx = this;
+        row.onclick = function (e) {
+            if (e.target.nodeName.toLowerCase() == 'td') {
+                var index = e.target.cellIndex;
+                if (selectable && index === 0) { //过滤掉是单选框的column
+                    return;
+                }
+                var col = selectable ? columns[index - 1] : columns[index],
+                    type = col.type || 'textbox',
+                    disabled = col.disabled;
+                if (!disabled) {
+                    ctx.editCell(e.target, type, col);
+                }
             }
+        };
+    },
+    editCell: function (cell, type, col) {
+        switch (type) {
+            case "textbox":
+                this.createTextBox(cell);
+                break;
+            case "dropdown":
+                this.createDropdown(cell, col);
+                break;
+            default:
+                break;
         }
-    }
-
-}
-
-//设置指定单元格可编辑  
-function EditCell(element, editType) {
-
-    var editType = element.getAttribute("EditType");
-    if (!editType) {
-        //如果当前单元格没有指定，则查看当前列是否指定  
-        editType = element.parentNode.parentNode.rows[0].cells[element.cellIndex].getAttribute("EditType");
-    }
-
-    switch (editType) {
-        case "TextBox":
-            CreateTextBox(element, element.innerHTML);
-            break;
-        case "DropDownList":
-            CreateDropDownList(element);
-            break;
-        default:
-            break;
-    }
-}
-
-//为单元格创建可编辑输入框  
-function CreateTextBox(element, value) {
-    //检查编辑状态，如果已经是编辑状态，跳过  
-    var editState = element.getAttribute("EditState");
-    if (editState != "true") {
-        //创建文本框  
-        var textBox = document.createElement("INPUT");
-        textBox.type = "text";
-        textBox.className = "EditCell_TextBox";
-
-
-        //设置文本框当前值  
-        if (!value) {
-            value = element.getAttribute("Value");
+    },
+    createTextBox: function (ele) {
+        var editStatus = ele.editStatus,
+            ctx = this;
+        if (!editStatus) {
+            var textbox = createInput();
+            textbox.type = "text";
+            textbox.className = "editCell_textbox";
+            textbox.value = ele.textContent;
+            //设置文本框的失去焦点事件  
+            textbox.onblur = function () {
+                ctx.editOk(this.parentNode, this.value);
+            };
+            //向当前单元格添加文本框  
+            this.clearChild(ele);
+            ele.appendChild(textbox);
+            textbox.focus();
+            textbox.select();
+            //改变状态变量  
+            ele.editStatus = true;
         }
-        textBox.value = value;
-
-        //设置文本框的失去焦点事件  
-        textBox.onblur = function() {
-            CancelEditCell(this.parentNode, this.value);
-        }
-        //向当前单元格添加文本框  
-        ClearChild(element);
-        element.appendChild(textBox);
-        textBox.focus();
-        textBox.select();
-
-        //改变状态变量  
-        element.setAttribute("EditState", "true");
-        element.parentNode.parentNode.setAttribute("CurrentRow", element.parentNode.rowIndex);
-    }
-
-}
-
-
-//为单元格创建选择框  
-function CreateDropDownList(element, value) {
-    //检查编辑状态，如果已经是编辑状态，跳过  
-    var editState = element.getAttribute("EditState");
-    if (editState != "true") {
-        //创建下接框  
-        var downList = document.createElement("Select");
-        downList.className = "EditCell_DropDownList";
-
-        //添加列表项  
-        var items = element.getAttribute("DataItems");
-        if (!items) {
-            items = element.parentNode.parentNode.rows[0].cells[element.cellIndex].getAttribute("DataItems");
-        }
-
-        if (items) {
-            items = eval("[" + items + "]");
-            for (var i = 0; i < items.length; i++) {
-                var oOption = document.createElement("OPTION");
-                oOption.text = items[i].text;
-                oOption.value = items[i].value;
-                downList.options.add(oOption);
+    },
+    createDropdown: function (ele, col) {
+        //检查编辑状态，如果已经是编辑状态，跳过  
+        var editState = ele.editStatus,
+            ctx = this;
+        if (!editState) {
+            //创建下接框  
+            var select = create('select');
+            select.className = "editCell_dropDown";
+            //添加列表项  
+            var items = col.options;
+            if (items) {
+                for (var i = 0; i < items.length; i++) {
+                    var item = items[i];
+                    var option = create('option');
+                    option.text = item.text;
+                    option.value = item.value;
+                    select.options.add(option);
+                }
             }
+            //设置列表当前值  
+            select.value = ele.value;
+            //设置创建下接框的失去焦点事件  
+            select.onblur = function () {
+                ctx.editOk(this.parentNode, this.value, this.options[this.selectedIndex].text);
+            };
+            //向当前单元格添加创建下拉框  
+            ctx.clearChild(ele);
+            ele.appendChild(select);
+            select.focus();
+            //记录状态的改变  
+            ele.editStatus = true;
         }
-
-        //设置列表当前值  
-        if (!value) {
-            value = element.getAttribute("Value");
+    },
+    editOk: function (ele, value, text) {
+        ele.value = value;
+        if (text) {
+            ele.innerHTML = text;
+        } else {
+            ele.innerHTML = value;
         }
-        downList.value = value;
-
-        //设置创建下接框的失去焦点事件  
-        downList.onblur = function() {
-            CancelEditCell(this.parentNode, this.value, this.options[this.selectedIndex].text);
-        }
-
-        //向当前单元格添加创建下接框  
-        ClearChild(element);
-        element.appendChild(downList);
-        downList.focus();
-
-        //记录状态的改变  
-        element.setAttribute("EditState", "true");
-        element.parentNode.parentNode.setAttribute("LastEditRow", element.parentNode.rowIndex);
-    }
-
-}
-
-
-//取消单元格编辑状态  
-function CancelEditCell(element, value, text) {
-    element.setAttribute("Value", value);
-    if (text) {
-        element.innerHTML = text;
-    } else {
-        element.innerHTML = value;
-    }
-    element.setAttribute("EditState", "false");
-
-    //检查是否有公式计算  
-    CheckExpression(element.parentNode);
-}
-
-//清空指定对象的所有字节点  
-function ClearChild(element) {
-    element.innerHTML = "";
-}
-
-//添加行  
-function AddRow(table, index) {
-    var lastRow = table.rows[table.rows.length - 1];
-    var newRow = lastRow.cloneNode(true);
-    var startIndex = $.inArray(lastRow, table.rows);
-    var endIndex = table.rows.length;
-    table.tBodies[0].appendChild(newRow);
-    newRow.cells[1].innerHTML = endIndex;
-    SetRowCanEdit(newRow);
-    return newRow;
-
-}
-
-
-//删除行  
-function DeleteRow(table, index) {
-    for (var i = table.rows.length - 1; i > 0; i--) {
-        var chkOrder = table.rows[i].cells[0].firstChild;
-        if (chkOrder) {
-            if (chkOrder.type = "CHECKBOX") {
-                if (chkOrder.checked) {
-                    //执行删除  
-                    table.deleteRow(i);
+        ele.editStatus = false;
+    },
+    clearChild: function (ele) {
+        ele.innerHTML = "";
+    },
+    addRow: function () {
+        // var lastRow = this.table.rows[this.table.rows.length - 1];
+        // var newRow = lastRow.cloneNode(true);
+        var newRow = this.createRow();
+        this.table.tBodies[0].appendChild(newRow);
+        this.setRowEditable(newRow);
+        return newRow;
+    },
+    deleteRow: function () {
+        var tab = this.table;
+        for (var i = tab.rows.length - 1; i > 0; i--) {
+            var chkOrder = tab.rows[i].cells[0].firstChild;
+            if (chkOrder) {
+                if (chkOrder.type === "checkbox") {
+                    if (chkOrder.checked) {
+                        //执行删除  
+                        tab.deleteRow(i);
+                    }
                 }
             }
         }
-    }
-}
-
-//提取表格的值,JSON格式  
-function GetTableData(table) {
-    var tableData = new Array();
-    alert("行数：" + table.rows.length);
-    for (var i = 1; i < table.rows.length; i++) {
-        tableData.push(GetRowData(tabProduct.rows[i]));
-    }
-
-    return tableData;
-
-}
-//提取指定行的数据，JSON格式  
-function GetRowData(row) {
-    var rowData = {};
-    for (var j = 0; j < row.cells.length; j++) {
-        name = row.parentNode.rows[0].cells[j].getAttribute("Name");
-        if (name) {
-            var value = row.cells[j].getAttribute("Value");
-            if (!value) {
-                value = row.cells[j].innerHTML;
-            }
-
-            rowData[name] = value;
+    },
+    getTableData: function () {
+        var data = [],
+            tab = this.table;
+        for (var i = 1; i < tab.rows.length; i++) {
+            data.push(this.getRowData(tab.rows[i]));
         }
-    }
-    //alert("ProductName:" + rowData.ProductName);  
-    //或者这样：alert("ProductName:" + rowData["ProductName"]);  
-    return rowData;
-
-}
-
-//检查当前数据行中需要运行的字段  
-function CheckExpression(row) {
-    for (var j = 0; j < row.cells.length; j++) {
-        expn = row.parentNode.rows[0].cells[j].getAttribute("Expression");
-        //如指定了公式则要求计算  
-        if (expn) {
-            var result = Expression(row, expn);
-            var format = row.parentNode.rows[0].cells[j].getAttribute("Format");
-            if (format) {
-                //如指定了格式，进行字值格式化  
-                row.cells[j].innerHTML = formatNumber(Expression(row, expn), format);
-            } else {
-                row.cells[j].innerHTML = Expression(row, expn);
-            }
+        this.data =data;
+        return data;
+    },
+    getRowData: function (row) {
+        var rowData = {},columns =this.opts.columns,selectable=this.opts.selectable;
+        for (var j = selectable?1:0; j < row.cells.length; j++) {
+            var cell =row.cells[j],col =columns[selectable?j-1:j];
+            rowData[col.code] =cell.value;
         }
-
-    }
-}
-
-//计算需要运算的字段  
-function Expression(row, expn) {
-    var rowData = GetRowData(row);
-    //循环代值计算  
-    for (var j = 0; j < row.cells.length; j++) {
-        name = row.parentNode.rows[0].cells[j].getAttribute("Name");
-        if (name) {
-            var reg = new RegExp(name, "i");
-            expn = expn.replace(reg, rowData[name].replace(/\,/g, ""));
-        }
-    }
-    return eval(expn);
-}
-
-///  
-/** 
- * 格式化数字显示方式   
- * 用法 
- * formatNumber(12345.999,'#,##0.00'); 
- * formatNumber(12345.999,'#,##0.##'); 
- * formatNumber(123,'000000'); 
- * @param num 
- * @param pattern 
- */
-/* 以下是范例 
-formatNumber('','')=0 
-formatNumber(123456789012.129,null)=123456789012 
-formatNumber(null,null)=0 
-formatNumber(123456789012.129,'#,##0.00')=123,456,789,012.12 
-formatNumber(123456789012.129,'#,##0.##')=123,456,789,012.12 
-formatNumber(123456789012.129,'#0.00')=123,456,789,012.12 
-formatNumber(123456789012.129,'#0.##')=123,456,789,012.12 
-formatNumber(12.129,'0.00')=12.12 
-formatNumber(12.129,'0.##')=12.12 
-formatNumber(12,'00000')=00012 
-formatNumber(12,'#.##')=12 
-formatNumber(12,'#.00')=12.00 
-formatNumber(0,'#.##')=0 
-*/
-function formatNumber(num, pattern) {
-    var strarr = num ? num.toString().split('.') : ['0'];
-    var fmtarr = pattern ? pattern.split('.') : [''];
-    var retstr = '';
-
-    // 整数部分    
-    var str = strarr[0];
-    var fmt = fmtarr[0];
-    var i = str.length - 1;
-    var comma = false;
-    for (var f = fmt.length - 1; f >= 0; f--) {
-        switch (fmt.substr(f, 1)) {
-            case '#':
-                if (i >= 0) retstr = str.substr(i--, 1) + retstr;
-                break;
-            case '0':
-                if (i >= 0) retstr = str.substr(i--, 1) + retstr;
-                else retstr = '0' + retstr;
-                break;
-            case ',':
-                comma = true;
-                retstr = ',' + retstr;
-                break;
-        }
-    }
-    if (i >= 0) {
-        if (comma) {
-            var l = str.length;
-            for (; i >= 0; i--) {
-                retstr = str.substr(i, 1) + retstr;
-                if (i > 0 && ((l - i) % 3) == 0) retstr = ',' + retstr;
-            }
-        } else retstr = str.substr(0, i + 1) + retstr;
+        return rowData;
     }
 
-    retstr = retstr + '.';
-    // 处理小数部分    
-    str = strarr.length > 1 ? strarr[1] : '';
-    fmt = fmtarr.length > 1 ? fmtarr[1] : '';
-    i = 0;
-    for (var f = 0; f < fmt.length; f++) {
-        switch (fmt.substr(f, 1)) {
-            case '#':
-                if (i < str.length) retstr += str.substr(i++, 1);
-                break;
-            case '0':
-                if (i < str.length) retstr += str.substr(i++, 1);
-                else retstr += '0';
-                break;
-        }
-    }
-    return retstr.replace(/^,+/, '').replace(/\.$/, '');
-}
+};

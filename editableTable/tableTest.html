@@ -1,0 +1,42 @@
+<html>
+
+<head>
+    <script src="http://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="editTable.js"></script>
+    <link rel="stylesheet" type="text/css" href="editTable.css">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>编辑表格数据</title>
+</head>
+
+<body>
+    <div id="xx"></div>
+        <!-- <div style="display: flex;flex-direction: column;width: 500;">
+            <div style="display: flex;justify-content: end;">
+                <div style="margin-right: 5;" class="circle">+</div>
+                <div class="circle">-</div>
+            </div>
+            <div id ="container"></div>
+        </div> -->
+    <script>
+       
+        var t =new TableEditable({
+            width:500,
+            columns:[{
+                code:"name",
+                name:'姓名',
+                value:'ljb',
+                width:100,
+            },{
+                code:"age",
+                name:"年龄",
+                type:'dropdown',
+                options:[{text:23,value:23},{text:24,value:24}],
+                value:23,
+                width:100
+            }]
+        });
+        document.getElementById("xx").appendChild(t.instance);
+    </script>
+</body>
+
+</html>
